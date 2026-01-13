@@ -1,4 +1,4 @@
-## Hi babe
+## Hi 
 
 <a href="https://github.com/devxb/gitanimals">
   <img
