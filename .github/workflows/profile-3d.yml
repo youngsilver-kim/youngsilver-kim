@@ -21,32 +21,28 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USERNAME: youngsilver-kim
 
-      - name: Force full pink theme
+      - name: Convert generated graph to pink theme
         run: |
           python - << 'PY'
           from pathlib import Path
           import re
+          import colorsys
 
           out_dir = Path("profile-3d-contrib")
           if not out_dir.exists():
               raise SystemExit("profile-3d-contrib directory not found")
 
-          # 원본 SVG 선택
-          preferred = [
+          candidates = [
               out_dir / "profile-gitblock.svg",
+              out_dir / "profile-night-rainbow.svg",
               out_dir / "profile-night-view.svg",
               out_dir / "profile-night-green.svg",
               out_dir / "profile-green.svg",
               out_dir / "profile-green-animate.svg",
-              out_dir / "profile-season.svg",
-              out_dir / "profile-season-animate.svg",
-              out_dir / "profile-south-season.svg",
-              out_dir / "profile-south-season-animate.svg",
-              out_dir / "profile-night-rainbow.svg",
           ]
 
           src = None
-          for p in preferred:
+          for p in candidates:
               if p.exists():
                   src = p
                   break
@@ -54,74 +50,80 @@ jobs:
           if src is None:
               svgs = list(out_dir.glob("*.svg"))
               if not svgs:
-                  raise SystemExit("No SVG generated in profile-3d-contrib/")
+                  raise SystemExit("No SVG file found in profile-3d-contrib/")
               src = svgs[0]
 
           text = src.read_text(encoding="utf-8")
 
-          # -----------------------------
-          # 1) CSS class / style 내부 색 전부 핑크화
-          # -----------------------------
-          # HEX 색상 전부 강제 치환
-          text = re.sub(r'#[0-9a-fA-F]{3,6}', '#ff69b4', text)
+          # ---------- helpers ----------
+          def hex_to_rgb(h):
+              h = h.lstrip("#")
+              if len(h) == 3:
+                  h = "".join(ch * 2 for ch in h)
+              return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-          # rgb(...) 전부 강제 치환
-          text = re.sub(r'rgb\([^)]*\)', 'rgb(255,105,180)', text)
+          def rgb_to_hex(rgb):
+              return "#{:02x}{:02x}{:02x}".format(*rgb)
 
-          # 이름 색상 전부 강제 치환
-          color_name_map = {
-              "red": "#ff69b4",
-              "blue": "#ff69b4",
-              "green": "#ff69b4",
-              "yellow": "#ff69b4",
-              "orange": "#ff69b4",
-              "purple": "#ff69b4",
-              "cyan": "#ff69b4",
-              "lime": "#ff69b4"
+          def pinkify(rgb):
+              r, g, b = rgb
+              h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+
+              # 거의 흰색 / 회색 / 검정은 유지
+              if s < 0.18:
+                  return rgb
+
+              # 핑크 hue로 강제 이동 (약 325도)
+              new_h = 325 / 360.0
+              new_s = max(0.35, min(0.75, s))
+              new_v = max(0.45, min(1.0, v))
+
+              nr, ng, nb = colorsys.hsv_to_rgb(new_h, new_s, new_v)
+              return (round(nr * 255), round(ng * 255), round(nb * 255))
+
+          # ---------- replace hex colors ----------
+          hex_pattern = re.compile(r'#[0-9a-fA-F]{3,6}')
+          seen_hex = {}
+
+          def replace_hex(match):
+              token = match.group(0)
+              try:
+                  rgb = hex_to_rgb(token)
+              except Exception:
+                  return token
+              if token not in seen_hex:
+                  seen_hex[token] = rgb_to_hex(pinkify(rgb))
+              return seen_hex[token]
+
+          text = hex_pattern.sub(replace_hex, text)
+
+          # ---------- replace rgb(...) colors ----------
+          rgb_pattern = re.compile(
+              r'rgb\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*\)'
+          )
+
+          def replace_rgb(match):
+              rgb = tuple(int(match.group(i)) for i in range(1, 4))
+              nr, ng, nb = pinkify(rgb)
+              return f"rgb({nr},{ng},{nb})"
+
+          text = rgb_pattern.sub(replace_rgb, text)
+
+          # ---------- optional: 배경/선 일부를 더 핑크 톤에 맞춤 ----------
+          text = text.replace("#ffffff", "#fffafc")
+          text = text.replace("#fff", "#fffafc")
+          text = text.replace("#000000", "#3a2438")
+          text = text.replace("#000", "#3a2438")
+
+          # 너무 연한 회색 선을 약간 핑크빛 회색으로
+          soft_replacements = {
+              "#d0d7de": "#e7d6e4",
+              "#c9d1d9": "#dec7da",
+              "#b1bac4": "#cdaec7",
+              "#8b949e": "#b690ae",
           }
-          for old, new in color_name_map.items():
-              text = re.sub(rf'\b{old}\b', new, text, flags=re.IGNORECASE)
-
-          # -----------------------------
-          # 2) 회색/검정/흰색 계열은 예쁘게 다시 지정
-          # -----------------------------
-          special_replacements = {
-              "#ff69b4": "#ff69b4",
-              "#000000": "#5c3a57",
-              "#ffffff": "#fff8fc"
-          }
-          for old, new in special_replacements.items():
+          for old, new in soft_replacements.items():
               text = text.replace(old, new)
-
-          # 바닥선/축/라벨이 너무 진하면 부드럽게
-          soft_map = {
-              "#5c3a57": "#c89abc",
-              "#fff8fc": "#fff8fc"
-          }
-          for old, new in soft_map.items():
-              text = text.replace(old, new)
-
-          # -----------------------------
-          # 3) 블록 면(face) 다양성 주기: 핑크 계열 3톤으로 분산
-          # -----------------------------
-          # 전부 같은 핑크면 너무 납작해 보여서 약간 다른 핑크톤 추가
-          pink_shades = ["#ff4fa3", "#ff69b4", "#ff8fc7"]
-          idx = 0
-
-          def cycle_pink(match):
-              nonlocal_idx = cycle_pink.counter
-              color = pink_shades[nonlocal_idx % len(pink_shades)]
-              cycle_pink.counter += 1
-              return color
-          cycle_pink.counter = 0
-
-          # 이미 핑크로 바뀐 색들 일부를 3톤으로 분산
-          text = re.sub(r'#ff69b4', cycle_pink, text)
-
-          # 배경은 너무 핑크가 되면 지저분하니 다시 연회색-핑크로 보정
-          text = text.replace("#ff4fa3", "#f2dbe9", 2)   # 상단 배경 일부
-          text = text.replace("#ff69b4", "#e7cddd", 2)   # 배경 일부
-          text = text.replace("#ff8fc7", "#d8b8cf", 2)   # 배경 일부
 
           out = out_dir / "profile-pink-forced.svg"
           out.write_text(text, encoding="utf-8")
