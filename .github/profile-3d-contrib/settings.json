@@ -3,15 +3,15 @@
   "backgroundColor": "#0d1117",
   "skyColor": "#1a1020",
   "groundColor": "#2a1630",
-  "axisColor": "#5a2f57",
-  "titleColor": "#F7D6F2",
-  "textColor": "#E8B7E1",
-  "borderColor": "#B370AA",
+  "axisColor": "#ff69b4",
+  "titleColor": "#ffb6c1",
+  "textColor": "#ffc0cb",
+  "borderColor": "#ff69b4",
   "palette": [
     "#2b1b2f",
     "#5a2f57",
-    "#8E4A88",
-    "#B370AA",
-    "#D98FD0"
+    "#ff69b4",
+    "#ff85c1",
+    "#ffc0cb"
   ]
 }
