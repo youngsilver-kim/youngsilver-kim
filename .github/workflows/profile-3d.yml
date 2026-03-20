@@ -1,9 +1,9 @@
 name: GitHub-Profile-3D-Contrib
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 18 * * *"
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,7 +11,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: generate-github-profile-3d-contrib
 
     steps:
       - uses: actions/checkout@v5
@@ -20,20 +19,26 @@ jobs:
         uses: yoshi389111/github-profile-3d-contrib@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          USERNAME: ${{ github.repository_owner }}
+          USERNAME: youngsilver-kim
 
-      - name: Create forced pink version
+      - name: Convert generated graph to pink theme
         run: |
           python - << 'PY'
           from pathlib import Path
+          import re
+          import colorsys
+
+          out_dir = Path("profile-3d-contrib")
+          if not out_dir.exists():
+              raise SystemExit("profile-3d-contrib directory not found")
 
           candidates = [
-              Path("profile-3d-contrib/profile-gitblock.svg"),
-              Path("profile-3d-contrib/profile-night-rainbow.svg"),
-              Path("profile-3d-contrib/profile-night-view.svg"),
-              Path("profile-3d-contrib/profile-night-green.svg"),
-              Path("profile-3d-contrib/profile-green.svg"),
-              Path("profile-3d-contrib/profile-green-animate.svg"),
+              out_dir / "profile-gitblock.svg",
+              out_dir / "profile-night-rainbow.svg",
+              out_dir / "profile-night-view.svg",
+              out_dir / "profile-night-green.svg",
+              out_dir / "profile-green.svg",
+              out_dir / "profile-green-animate.svg",
           ]
 
           src = None
@@ -43,47 +48,92 @@ jobs:
                   break
 
           if src is None:
-              raise SystemExit("No generated SVG found in profile-3d-contrib/")
+              svgs = list(out_dir.glob("*.svg"))
+              if not svgs:
+                  raise SystemExit("No SVG file found in profile-3d-contrib/")
+              src = svgs[0]
 
           text = src.read_text(encoding="utf-8")
 
-          replacements = {
-              "#0d1117": "#0d1117",
-              "#161b22": "#1a1020",
-              "#22272e": "#24112b",
-              "#2d333b": "#2b1632",
-              "#39d353": "#ff69b4",
-              "#26a641": "#ff85c1",
-              "#006d32": "#d96bb3",
-              "#0e4429": "#8E4A88",
-              "#9be9a8": "#ffc0cb",
-              "#40c463": "#ff9ad5",
-              "#30a14e": "#ff69b4",
-              "#216e39": "#b370aa",
-              "#ebedf0": "#f7d6f2",
-              "#79c0ff": "#ffb6c1",
-              "#58a6ff": "#ff85c1",
-              "#ffa657": "#ff9ad5",
-              "#f778ba": "#ff69b4"
-          }
+          # ---------- helpers ----------
+          def hex_to_rgb(h):
+              h = h.lstrip("#")
+              if len(h) == 3:
+                  h = "".join(ch * 2 for ch in h)
+              return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-          for old, new in replacements.items():
+          def rgb_to_hex(rgb):
+              return "#{:02x}{:02x}{:02x}".format(*rgb)
+
+          def pinkify(rgb):
+              r, g, b = rgb
+              h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+
+              # 거의 흰색 / 회색 / 검정은 유지
+              if s < 0.18:
+                  return rgb
+
+              # 핑크 hue로 강제 이동 (약 325도)
+              new_h = 325 / 360.0
+              new_s = max(0.35, min(0.75, s))
+              new_v = max(0.45, min(1.0, v))
+
+              nr, ng, nb = colorsys.hsv_to_rgb(new_h, new_s, new_v)
+              return (round(nr * 255), round(ng * 255), round(nb * 255))
+
+          # ---------- replace hex colors ----------
+          hex_pattern = re.compile(r'#[0-9a-fA-F]{3,6}')
+          seen_hex = {}
+
+          def replace_hex(match):
+              token = match.group(0)
+              try:
+                  rgb = hex_to_rgb(token)
+              except Exception:
+                  return token
+              if token not in seen_hex:
+                  seen_hex[token] = rgb_to_hex(pinkify(rgb))
+              return seen_hex[token]
+
+          text = hex_pattern.sub(replace_hex, text)
+
+          # ---------- replace rgb(...) colors ----------
+          rgb_pattern = re.compile(
+              r'rgb\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*\)'
+          )
+
+          def replace_rgb(match):
+              rgb = tuple(int(match.group(i)) for i in range(1, 4))
+              nr, ng, nb = pinkify(rgb)
+              return f"rgb({nr},{ng},{nb})"
+
+          text = rgb_pattern.sub(replace_rgb, text)
+
+          # ---------- optional: 배경/선 일부를 더 핑크 톤에 맞춤 ----------
+          text = text.replace("#ffffff", "#fffafc")
+          text = text.replace("#fff", "#fffafc")
+          text = text.replace("#000000", "#3a2438")
+          text = text.replace("#000", "#3a2438")
+
+          # 너무 연한 회색 선을 약간 핑크빛 회색으로
+          soft_replacements = {
+              "#d0d7de": "#e7d6e4",
+              "#c9d1d9": "#dec7da",
+              "#b1bac4": "#cdaec7",
+              "#8b949e": "#b690ae",
+          }
+          for old, new in soft_replacements.items():
               text = text.replace(old, new)
 
-          text = text.replace("rgb(0,0,0)", "rgb(179,112,170)")
-          text = text.replace("rgb(13,17,23)", "rgb(26,16,32)")
-          text = text.replace("rgb(22,27,34)", "rgb(36,17,43)")
-
-          out = Path("profile-3d-contrib/profile-pink-forced.svg")
+          out = out_dir / "profile-pink-forced.svg"
           out.write_text(text, encoding="utf-8")
           print(f"Created {out} from {src}")
           PY
 
-      - name: Commit & Push
+      - name: Commit result
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add -A .
-          if git commit -m "generated pink 3d contribution graph"; then
-            git push
-          fi
+          git add .
+          git commit -m "update pink graph" || echo "no changes"
+          git push
