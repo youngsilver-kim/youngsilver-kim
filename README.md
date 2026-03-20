@@ -2,4 +2,4 @@
 
 <img src="./profile-3d-contrib/profile-night-rainbow.svg"
      width="100%"
-     style="filter: hue-rotate(310deg) saturate(3.5) brightness(1.2) contrast(1.2);" />
+     style="filter: hue-rotate(320deg) saturate(5) brightness(1.15) contrast(1.3);"
