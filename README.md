@@ -1,9 +1,1 @@
-## Hi 
-
-<a href="https://github.com/devxb/gitanimals">
-  <img
-    src="https://render.gitanimals.org/farms/youngsilver-kim?v=1"
-    width="1000"
-  />
-</a>
-
+[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&duration=3000&pause=1000&color=B370AA&width=435&lines=I+train+models%2C+but+they+train+my+patience+harder.;99%25+sure+it%E2%80%99s+a+data+problem.+(It%E2%80%99s+me.);I+turn+coffee+into+questionable+code+and+occasional+breakthroughs.;Currently+optimizing%3A+accuracy+%E2%86%91%2C+sleep+%E2%86%93;Training...+please+wait+%E2%8F%B3)](https://git.io/typing-svg)
