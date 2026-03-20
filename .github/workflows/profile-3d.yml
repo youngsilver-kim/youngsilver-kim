@@ -47,7 +47,6 @@ jobs:
 
           text = src.read_text(encoding="utf-8")
 
-          # 강제 핑크 팔레트 치환
           replacements = {
               "#0d1117": "#0d1117",
               "#161b22": "#1a1020",
@@ -71,7 +70,6 @@ jobs:
           for old, new in replacements.items():
               text = text.replace(old, new)
 
-          # 검정 계열이 너무 많이 남으면 보조 치환
           text = text.replace("rgb(0,0,0)", "rgb(179,112,170)")
           text = text.replace("rgb(13,17,23)", "rgb(26,16,32)")
           text = text.replace("rgb(22,27,34)", "rgb(36,17,43)")
