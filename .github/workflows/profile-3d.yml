@@ -21,13 +21,71 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USERNAME: ${{ github.repository_owner }}
-          SETTING_JSON: .github/profile-3d-contrib/settings.json
+
+      - name: Create forced pink version
+        run: |
+          python - << 'PY'
+          from pathlib import Path
+
+          candidates = [
+              Path("profile-3d-contrib/profile-gitblock.svg"),
+              Path("profile-3d-contrib/profile-night-rainbow.svg"),
+              Path("profile-3d-contrib/profile-night-view.svg"),
+              Path("profile-3d-contrib/profile-night-green.svg"),
+              Path("profile-3d-contrib/profile-green.svg"),
+              Path("profile-3d-contrib/profile-green-animate.svg"),
+          ]
+
+          src = None
+          for p in candidates:
+              if p.exists():
+                  src = p
+                  break
+
+          if src is None:
+              raise SystemExit("No generated SVG found in profile-3d-contrib/")
+
+          text = src.read_text(encoding="utf-8")
+
+          # 강제 핑크 팔레트 치환
+          replacements = {
+              "#0d1117": "#0d1117",
+              "#161b22": "#1a1020",
+              "#22272e": "#24112b",
+              "#2d333b": "#2b1632",
+              "#39d353": "#ff69b4",
+              "#26a641": "#ff85c1",
+              "#006d32": "#d96bb3",
+              "#0e4429": "#8E4A88",
+              "#9be9a8": "#ffc0cb",
+              "#40c463": "#ff9ad5",
+              "#30a14e": "#ff69b4",
+              "#216e39": "#b370aa",
+              "#ebedf0": "#f7d6f2",
+              "#79c0ff": "#ffb6c1",
+              "#58a6ff": "#ff85c1",
+              "#ffa657": "#ff9ad5",
+              "#f778ba": "#ff69b4"
+          }
+
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+
+          # 검정 계열이 너무 많이 남으면 보조 치환
+          text = text.replace("rgb(0,0,0)", "rgb(179,112,170)")
+          text = text.replace("rgb(13,17,23)", "rgb(26,16,32)")
+          text = text.replace("rgb(22,27,34)", "rgb(36,17,43)")
+
+          out = Path("profile-3d-contrib/profile-pink-forced.svg")
+          out.write_text(text, encoding="utf-8")
+          print(f"Created {out} from {src}")
+          PY
 
       - name: Commit & Push
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add -A .
-          if git commit -m "generated 3d contribution graph"; then
+          if git commit -m "generated pink 3d contribution graph"; then
             git push
           fi
