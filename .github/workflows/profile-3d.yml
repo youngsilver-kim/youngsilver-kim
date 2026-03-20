@@ -21,7 +21,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USERNAME: youngsilver-kim
 
-      - name: Convert generated graph to pink theme
+      - name: Force pink theme for SVG
         run: |
           python - << 'PY'
           from pathlib import Path
@@ -29,9 +29,6 @@ jobs:
           import colorsys
 
           out_dir = Path("profile-3d-contrib")
-          if not out_dir.exists():
-              raise SystemExit("profile-3d-contrib directory not found")
-
           candidates = [
               out_dir / "profile-gitblock.svg",
               out_dir / "profile-night-rainbow.svg",
@@ -48,18 +45,14 @@ jobs:
                   break
 
           if src is None:
-              svgs = list(out_dir.glob("*.svg"))
-              if not svgs:
-                  raise SystemExit("No SVG file found in profile-3d-contrib/")
-              src = svgs[0]
+              raise SystemExit("No source SVG found.")
 
           text = src.read_text(encoding="utf-8")
 
-          # ---------- helpers ----------
           def hex_to_rgb(h):
               h = h.lstrip("#")
               if len(h) == 3:
-                  h = "".join(ch * 2 for ch in h)
+                  h = "".join(c * 2 for c in h)
               return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
           def rgb_to_hex(rgb):
@@ -69,60 +62,63 @@ jobs:
               r, g, b = rgb
               h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
 
-              # 거의 흰색 / 회색 / 검정은 유지
-              if s < 0.18:
-                  return rgb
+              # 흰색/회색/검정은 거의 유지
+              if s < 0.12:
+                  # 회색은 약간 핑크 회색으로
+                  avg = int((r + g + b) / 3)
+                  if avg > 235:
+                      return (255, 250, 252)
+                  if avg < 40:
+                      return (58, 36, 56)
+                  return (min(255, avg + 18), max(0, avg - 8), min(255, avg + 12))
 
-              # 핑크 hue로 강제 이동 (약 325도)
+              # 채도 있는 색은 모두 핑크 hue로 강제 이동
               new_h = 325 / 360.0
-              new_s = max(0.35, min(0.75, s))
-              new_v = max(0.45, min(1.0, v))
-
+              new_s = max(0.45, min(0.85, s))
+              new_v = max(0.55, min(1.0, v))
               nr, ng, nb = colorsys.hsv_to_rgb(new_h, new_s, new_v)
               return (round(nr * 255), round(ng * 255), round(nb * 255))
 
-          # ---------- replace hex colors ----------
+          # 1) #RRGGBB / #RGB 치환
           hex_pattern = re.compile(r'#[0-9a-fA-F]{3,6}')
-          seen_hex = {}
-
-          def replace_hex(match):
-              token = match.group(0)
+          def replace_hex(m):
+              token = m.group(0)
               try:
                   rgb = hex_to_rgb(token)
               except Exception:
                   return token
-              if token not in seen_hex:
-                  seen_hex[token] = rgb_to_hex(pinkify(rgb))
-              return seen_hex[token]
-
+              return rgb_to_hex(pinkify(rgb))
           text = hex_pattern.sub(replace_hex, text)
 
-          # ---------- replace rgb(...) colors ----------
-          rgb_pattern = re.compile(
-              r'rgb\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*\)'
-          )
-
-          def replace_rgb(match):
-              rgb = tuple(int(match.group(i)) for i in range(1, 4))
+          # 2) rgb(r,g,b) 치환
+          rgb_pattern = re.compile(r'rgb\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*\)')
+          def replace_rgb(m):
+              rgb = tuple(int(m.group(i)) for i in range(1, 4))
               nr, ng, nb = pinkify(rgb)
               return f"rgb({nr},{ng},{nb})"
-
           text = rgb_pattern.sub(replace_rgb, text)
 
-          # ---------- optional: 배경/선 일부를 더 핑크 톤에 맞춤 ----------
-          text = text.replace("#ffffff", "#fffafc")
-          text = text.replace("#fff", "#fffafc")
-          text = text.replace("#000000", "#3a2438")
-          text = text.replace("#000", "#3a2438")
-
-          # 너무 연한 회색 선을 약간 핑크빛 회색으로
-          soft_replacements = {
-              "#d0d7de": "#e7d6e4",
-              "#c9d1d9": "#dec7da",
-              "#b1bac4": "#cdaec7",
-              "#8b949e": "#b690ae",
+          # 3) 남는 대표 원색 직접 강제 치환
+          hard_replace = {
+              "red": "#ff69b4",
+              "blue": "#c86bff",
+              "green": "#ff85c8",
+              "yellow": "#ffd1ea",
+              "#ff0000": "#ff4fa3",
+              "#00ff00": "#ff85c8",
+              "#0000ff": "#c86bff",
+              "#ffff00": "#ffd1ea",
+              "#39d353": "#ff69b4",
+              "#26a641": "#ff85c8",
+              "#0e4429": "#8e4a88",
+              "#58a6ff": "#c86bff",
+              "#ffa657": "#ff9ad5",
+              "#f778ba": "#ff69b4",
+              "#ebedf0": "#f7d6f2",
+              "#ffffff": "#fffafc",
+              "#000000": "#3a2438"
           }
-          for old, new in soft_replacements.items():
+          for old, new in hard_replace.items():
               text = text.replace(old, new)
 
           out = out_dir / "profile-pink-forced.svg"
